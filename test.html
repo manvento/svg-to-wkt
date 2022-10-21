@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test</title>
+</head>
+<script type="text/javascript"
+        src="./libs/jquery-3.6.1.min.js"></script>
+<script type="text/javascript"
+        src="./libs/lodash.js"></script>
+<script type="text/javascript" src="./svg-to-wkt.js"></script>
+<script type="text/javascript">
+
+  var data_read = [];
+
+  function bin2string(array) {
+    var result = "";
+    for (var i = 0; i < array.length; ++i) {
+      result += (String.fromCharCode(array[i]));
+    }
+    return result;
+  }
+
+  function fetchStream(stream) {
+    data_read = [];
+    const reader = stream.getReader();
+    let charsReceived = 0;
+
+    // read() returns a promise that resolves
+    // when a value has been received
+    reader.read().then(function processText({done, value}) {
+      // Result objects contain two properties:
+      // done  - true if the stream has already given you all its data.
+      // value - some data. Always undefined when done is true.
+      if (done) {
+        console.log("Stream complete");
+        if (value) {
+          data_read = $.merge(data_read, value);
+        }
+        convert(bin2string(data_read));
+        return;
+      }
+
+      // value for fetch streams is a Uint8Array
+      charsReceived += value.length;
+      const chunk = value;
+      // console.log(`Received ${charsReceived} characters so far. Current chunk = ${chunk}`);
+      data_read = $.merge(data_read, chunk);
+
+      // Read some more, and call this function again
+      return reader.read().then(processText);
+    });
+  }
+
+
+  function onClickHandler(ev) {
+    var el = window._protected_reference = document.createElement("INPUT");
+    el.type = "file";
+    el.accept = "image/svg+xml";
+    el.multiple = "multiple"; // remove to have a single file selection
+
+    // (cancel will not trigger 'change')
+    el.addEventListener('change', function (ev2) {
+      // access el.files[] to do something with it (test its length!)
+
+      // add first image, if available
+      if (el.files.length) {
+        fetchStream(el.files[0].stream());
+      }
+
+
+      // test some async handling
+      new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve();
+        }, 1000);
+      })
+        .then(function () {
+          // clear / free reference
+          el = window._protected_reference = undefined;
+        });
+
+    });
+
+    el.click(); // open
+  }
+
+  function copyToClipboard() {
+    const element = $('textarea#result');
+    // Select the text field
+    element.select();
+    if (element.setSelectionRange) {
+      element.setSelectionRange(0, 99999); // For mobile devices
+    }
+    // Copy the text inside the text field
+    navigator.clipboard.writeText(element.val());
+  }
+
+  function convert(svg_content) {
+    const result = SVGtoWKT.convert(svg_content);
+    $('textarea#result').val('wkt://' + result);
+  }
+</script>
+<body>
+<button onClick="onClickHandler(event)">select an SVG to convert</button>
+<button onClick="copyToClipboard(event)">Copy to clipboard</button>
+<form>
+  <textarea id="result" cols="80" rows="20">
+
+  </textarea>
+</form>
+</body>
+</html>
